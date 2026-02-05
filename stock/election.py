@@ -11,7 +11,7 @@ file_2070 = BASE_DIR / "data" / "monthly" / "data2070.xlsx"
 file_2079 = BASE_DIR / "data" / "monthly" / "data2079.xlsx"
 file_2082 = BASE_DIR / "data" / "monthly" / "data2082.xlsx"
 
-output_path = BASE_DIR / "sector_2070_vs_2079_vs_2082.png"
+output_path = BASE_DIR / "sector_momentum_2070_vs_2079_vs_2082.png"
 
 # -----------------------------
 # Read Excel files
@@ -47,39 +47,33 @@ rename_map = {
 
     "Manufacturing and Processing": "Manufacturing",
     "Manufact": "Manufacturing",
-    "MANUFACTURING AND PROCESSING":"Manufacturing",
-
+    "MANUFACTURING AND PROCESSING": "Manufacturing",
 
     "Hotel": "Hotels",
     "Hotels And Tourism": "Hotels",
-    "HOTELS AND TOURISM":"Hotels",
+    "HOTELS AND TOURISM": "Hotels",
 
     "HydroPower": "Hydro Power",
-    "Hydro Power": "Hydro Power",
-    "HYDRO POWER":"Hydro Power",
+    "HYDRO POWER": "Hydro Power",
 
     "Dev.Bank": "Development Bank",
-    "Development Bank": "Development Bank",
-    "DEVELOPMENT BANKS":"Development Bank",
+    "DEVELOPMENT BANKS": "Development Bank",
 
     "Insurance": "Insurance",
-    "LIFE INSURANCE":"Insurance",
+    "LIFE INSURANCE": "Insurance",
+    "NON LIFE INSURANCE": "Insurance",
 
-    "MICROFINANCE":"Micro Finance",
+    "MICROFINANCE": "Micro Finance",
 
-    "INVESTMENT":"Investment",
+    "INVESTMENT": "Investment",
 
-    "Non Life Insurance": "Insurance",
-    "NON LIFE INSURANCE":"Insurance",
-
-    "Finance": "Finance",
-    "FINANCE":"Finance",
+    "FINANCE": "Finance",
 
     "Trading": "Trading",
-    "TRADINGS":"Trading",
+    "TRADINGS": "Trading",
 
     "Others": "Others",
-    "OTHERS":"Others"
+    "OTHERS": "Others"
 }
 
 df70 = df70.rename(columns=rename_map)
@@ -89,14 +83,17 @@ df82 = df82.rename(columns=rename_map)
 # -----------------------------
 # Drop Date completely
 # -----------------------------
-df70 = df70.drop(columns=[c for c in df70.columns if c.lower() == "date"], errors="ignore")
-df79 = df79.drop(columns=[c for c in df79.columns if c.lower() == "date"], errors="ignore")
-df82 = df82.drop(columns=[c for c in df82.columns if c.lower() == "date"], errors="ignore")
+def drop_date(df):
+    return df.drop(columns=[c for c in df.columns if c.lower() == "date"], errors="ignore")
+
+df70 = drop_date(df70)
+df79 = drop_date(df79)
+df82 = drop_date(df82)
 
 # -----------------------------
 # Keep only common sectors
 # -----------------------------
-common_sectors = sorted(set(df70.columns) & set(df79.columns))
+common_sectors = sorted(set(df70.columns) & set(df79.columns) & set(df82.columns))
 
 df70 = df70[common_sectors]
 df79 = df79[common_sectors]
@@ -110,14 +107,14 @@ df79 = df79.reset_index(drop=True)
 df82 = df82.reset_index(drop=True)
 
 # -----------------------------
-# Normalize (Base = 100)
+# Calculate % change (Momentum)
 # -----------------------------
-df70_norm = df70 / df70.iloc[0] * 100
-df79_norm = df79 / df79.iloc[0] * 100
-df82_norm = df82 / df82.iloc[0] * 100
+df70_pct = df70.pct_change() * 100
+df79_pct = df79.pct_change() * 100
+df82_pct = df82.pct_change() * 100
 
 # -----------------------------
-# Plot sector-wise pattern comparison
+# Plot sector-wise momentum comparison
 # -----------------------------
 fig, axes = plt.subplots(
     nrows=len(common_sectors),
@@ -130,12 +127,13 @@ if len(common_sectors) == 1:
     axes = [axes]
 
 for ax, sector in zip(axes, common_sectors):
-    ax.plot(df70_norm.index, df70_norm[sector], label="2070", linewidth=2)
-    ax.plot(df79_norm.index, df79_norm[sector], label="2079", linewidth=2)
-    ax.plot(df82_norm.index, df82_norm[sector], label="2082", linewidth=2)
+    ax.plot(df70_pct.index, df70_pct[sector], label="2070", linewidth=1.8)
+    ax.plot(df79_pct.index, df79_pct[sector], label="2079", linewidth=1.8)
+    ax.plot(df82_pct.index, df82_pct[sector], label="2082", linewidth=1.8)
 
-    ax.set_title(f"{sector} – Pattern Comparison (Date Ignored)", fontsize=14)
-    ax.set_ylabel("Index (Base = 100)")
+    ax.axhline(0, linewidth=1)  # zero line = expansion vs contraction
+    ax.set_title(f"{sector} – % Change (Momentum View, Date Ignored)", fontsize=14)
+    ax.set_ylabel("% Change")
     ax.grid(True)
     ax.legend()
 
@@ -145,5 +143,5 @@ plt.tight_layout()
 plt.savefig(output_path, dpi=300)
 plt.close()
 
-print("✅ Pattern-aligned sector comparison saved:")
+print("✅ Sector momentum comparison saved:")
 print(output_path)
