@@ -7,18 +7,18 @@ from pathlib import Path
 # -----------------------------
 BASE_DIR = Path(__file__).resolve().parent
 
-file_2070 = BASE_DIR / "data" / "monthly" / "data2070.xlsx"
-file_2079 = BASE_DIR / "data" / "monthly" / "data2079.xlsx"
-file_2082 = BASE_DIR / "data" / "monthly" / "data2082.xlsx"
+# file_2071 = BASE_DIR / "data" / "nonelection" / "data2071.xlsx"
+file_2081 = BASE_DIR / "data" / "nonelection" / "data2081.xlsx"
+file_2080 = BASE_DIR / "data" / "nonelection" / "data2080.xlsx"
 
-output_path = BASE_DIR / "sector_momentum_2070_vs_2079_vs_2082.png"
+output_path = BASE_DIR / "sector_momentum_2071_vs_2080_vs_2081.png"
 
 # -----------------------------
 # Read Excel files
 # -----------------------------
-df70 = pd.read_excel(file_2070)
-df79 = pd.read_excel(file_2079)
-df82 = pd.read_excel(file_2082)
+# df71 = pd.read_excel(file_2071)
+df81 = pd.read_excel(file_2081)
+df80 = pd.read_excel(file_2080)
 
 # -----------------------------
 # Clean column headers
@@ -33,9 +33,9 @@ def clean_columns(df):
     )
     return df
 
-df70 = clean_columns(df70)
-df79 = clean_columns(df79)
-df82 = clean_columns(df82)
+# df71 = clean_columns(df71)
+df81 = clean_columns(df81)
+df80 = clean_columns(df80)
 
 # -----------------------------
 # Normalize sector names
@@ -60,8 +60,8 @@ rename_map = {
     "DEVELOPMENT BANKS": "Development Bank",
 
     "Insurance": "Insurance",
-    "LIFE INSURANCE": "Insurance",
-    "NON LIFE INSURANCE": "Insurance",
+    "LIFE INSURANCE": "Life Insurance",
+    "NON LIFE INSURANCE": "Non Life Insurance",
 
     "MICROFINANCE": "Micro Finance",
 
@@ -76,9 +76,9 @@ rename_map = {
     "OTHERS": "Others"
 }
 
-df70 = df70.rename(columns=rename_map)
-df79 = df79.rename(columns=rename_map)
-df82 = df82.rename(columns=rename_map)
+# df71 = df71.rename(columns=rename_map)
+df81 = df81.rename(columns=rename_map)
+df80 = df80.rename(columns=rename_map)
 
 # -----------------------------
 # Drop Date completely
@@ -86,32 +86,32 @@ df82 = df82.rename(columns=rename_map)
 def drop_date(df):
     return df.drop(columns=[c for c in df.columns if c.lower() == "date"], errors="ignore")
 
-df70 = drop_date(df70)
-df79 = drop_date(df79)
-df82 = drop_date(df82)
+# df71 = drop_date(df71)
+df81 = drop_date(df81)
+df80 = drop_date(df80)
 
 # -----------------------------
 # Keep only common sectors
 # -----------------------------
-common_sectors = sorted(set(df70.columns) & set(df79.columns) & set(df82.columns))
+common_sectors = sorted(set(df81.columns) & set(df80.columns))
 
-df70 = df70[common_sectors]
-df79 = df79[common_sectors]
-df82 = df82[common_sectors]
+# df71 = df71[common_sectors]
+df81 = df81[common_sectors]
+df80 = df80[common_sectors]
 
 # -----------------------------
 # Reset index → same timeline
 # -----------------------------
-df70 = df70.reset_index(drop=True)
-df79 = df79.reset_index(drop=True)
-df82 = df82.reset_index(drop=True)
+# df71 = df71.reset_index(drop=True)
+df81 = df81.reset_index(drop=True)
+df80 = df80.reset_index(drop=True)
 
 # -----------------------------
 # Calculate % change (Momentum)
 # -----------------------------
-df70_pct = df70.pct_change() * 100
-df79_pct = df79.pct_change() * 100
-df82_pct = df82.pct_change() * 100
+# df71_pct = df71.pct_change().iloc[1:] * 100
+df80_pct = df80.pct_change().iloc[1:] * 100
+df81_pct = df81.pct_change().iloc[1:] * 100
 
 # -----------------------------
 # Plot sector-wise momentum comparison
@@ -127,9 +127,9 @@ if len(common_sectors) == 1:
     axes = [axes]
 
 for ax, sector in zip(axes, common_sectors):
-    ax.plot(df70_pct.index, df70_pct[sector], label="2070", linewidth=1.8)
-    ax.plot(df79_pct.index, df79_pct[sector], label="2079", linewidth=1.8)
-    ax.plot(df82_pct.index, df82_pct[sector], label="2082", linewidth=1.8)
+    # ax.plot(df71_pct.index, df71_pct[sector], label="2071", linewidth=1.8)
+    ax.plot(df81_pct.index, df81_pct[sector], label="2081", linewidth=1.8)
+    ax.plot(df80_pct.index, df80_pct[sector], label="2080", linewidth=1.8)
 
     ax.axhline(0, linewidth=1)  # zero line = expansion vs contraction
     ax.set_title(f"{sector} – % Change (Momentum View, Date Ignored)", fontsize=14)
