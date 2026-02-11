@@ -10,6 +10,49 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 
+SECTORS_TO_COMPARE = [
+    # "NEPSE",
+    "Banking",
+    "Hydro Power",
+    # "Development Bank",
+    # "Finance",
+    # "Life Insurance",
+    # "Non-Life Insurance",
+    # "Microfinance",
+    "Hotels and Tourism",
+    "Manufacturing and Processing",
+    # "Trading",
+    # "Investment",
+    # "Mutual Fund",
+]
+
+def normalize_base_100(df, columns, base_date=None):
+    """
+    Normalize given columns to Base = 100
+    """
+    norm_df = df.copy()
+
+    if base_date is None:
+        base_date = norm_df["Date"].min()
+
+    base_row = norm_df[norm_df["Date"] == base_date]
+
+    if base_row.empty:
+        return norm_df
+
+    for col in columns:
+        if col not in norm_df.columns:
+            continue
+
+        base_value = base_row[col].values[0]
+
+        if pd.isna(base_value) or base_value == 0:
+            continue
+
+        norm_df[col] = (norm_df[col] / base_value) * 100
+
+    return norm_df
+
 # Finance Minister events
 fm_events = pd.DataFrame({
     "Date": [
@@ -157,122 +200,91 @@ def normalize_date_column(df):
     df["Date"] = df["Date"].apply(parse_mixed_date)
     return df
 
-
 def create_fm_impact_graph(file_name, df, fm_events, output_dir):
     """
-    Create a graph showing NEPSE index with Finance Minister change events
+    Create a normalized (Base 100) graph comparing sector reactions
     """
-    # Filter valid dates
     df = df[df["Date"].notna()].copy()
     df = df.sort_values("Date")
-    
+
     if len(df) == 0:
         print(f"⚠️  No valid data for {file_name}")
         return
-    
-    # Check if NEPSE column exists
-    if "NEPSE" not in df.columns:
-        print(f"⚠️  No NEPSE column found in {file_name}")
-        print(f"   Available columns: {list(df.columns)}")
+
+    # Find available sectors in this file
+    available_sectors = [s for s in SECTORS_TO_COMPARE if s in df.columns]
+
+    if len(available_sectors) < 2:
+        print(f"⚠️  Not enough sector data in {file_name}")
         return
-    
-    # Filter NEPSE data
-    nepse_data = df[["Date", "NEPSE"]].dropna()
-    
-    if len(nepse_data) == 0:
-        print(f"⚠️  No valid NEPSE data for {file_name}")
-        return
-    
-    # Get date range from data
-    min_date = nepse_data["Date"].min()
-    max_date = nepse_data["Date"].max()
-    
+
+    # Normalize to Base 100
+    df_norm = normalize_base_100(df, available_sectors)
+
+    min_date = df_norm["Date"].min()
+    max_date = df_norm["Date"].max()
+
     print(f"\n📊 Processing {file_name}")
-    print(f"   Date range: {min_date.strftime('%Y-%m-%d')} to {max_date.strftime('%Y-%m-%d')}")
-    print(f"   NEPSE data points: {len(nepse_data)}")
-    
-    # Filter FM events to those within the data range
+    print(f"   Date range: {min_date.date()} → {max_date.date()}")
+    print(f"   Sectors compared: {available_sectors}")
+
     relevant_fm_events = fm_events[
-        (fm_events["Date"] >= min_date) & 
+        (fm_events["Date"] >= min_date) &
         (fm_events["Date"] <= max_date)
     ]
-    
-    print(f"   FM events in range: {len(relevant_fm_events)}")
-    for _, event in relevant_fm_events.iterrows():
-        print(f"      - {event['Date'].strftime('%Y-%m-%d')}: {event['Finance Minister']}")
-    
-    # Create figure
+
     fig, ax = plt.subplots(figsize=(16, 9))
-    
-    # Plot NEPSE index
-    ax.plot(nepse_data["Date"], nepse_data["NEPSE"], 
-           linewidth=2.5, color="#1f77b4", label="NEPSE Index", alpha=0.9)
-    
-    # Add vertical lines for FM events with side labels
-    event_colors = ['#FF0000', '#FF4500', '#DC143C', '#B22222', '#8B0000']
-    
-    for idx, (_, row) in enumerate(relevant_fm_events.iterrows()):
-        event_date = row["Date"]
-        fm_name = row["Finance Minister"]
-        
-        color = event_colors[idx % len(event_colors)]
-        
-        # Draw vertical line
-        ax.axvline(x=event_date, color=color, linestyle='--', linewidth=2.5, alpha=0.7)
-        
-        # Add label on the right side
-        ylim = ax.get_ylim()
-        y_range = ylim[1] - ylim[0]
-        
-        # Stagger labels vertically to avoid overlap
-        y_offset = ylim[1] - (idx * y_range * 0.15)
-        
-        # Add text on the right side
-        ax.text(1.01, y_offset / ylim[1], 
-               f"📅 {event_date.strftime('%Y-%m-%d')}\n{fm_name}", 
-               transform=ax.get_yaxis_transform(),
-               fontsize=10, color=color, weight='bold',
-               verticalalignment='top',
-               bbox=dict(boxstyle='round,pad=0.5', facecolor='lightyellow', 
-                        edgecolor=color, alpha=0.9, linewidth=2))
-    
-    # Formatting
-    ax.set_xlabel("Date", fontsize=13, weight='bold')
-    ax.set_ylabel("NEPSE Index Value", fontsize=13, weight='bold')
-    ax.set_title(f"Finance Minister Impact on NEPSE Index\n{file_name}", 
-                fontsize=15, weight='bold', pad=20)
-    
-    # Format x-axis dates based on date range
-    date_range_days = (max_date - min_date).days
-    
-    if date_range_days < 90:  # Less than 3 months
-        ax.xaxis.set_major_locator(mdates.WeekdayLocator(interval=1))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-    elif date_range_days < 365:  # Less than 1 year
-        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
-    else:  # More than 1 year
-        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
-    
-    plt.xticks(rotation=45, ha='right', fontsize=10)
-    
-    # Add grid
-    ax.grid(True, alpha=0.3, linestyle=':', linewidth=0.5)
-    
-    # Legend
-    ax.legend(loc='upper left', fontsize=11, framealpha=0.9)
-    
-    # Adjust layout to make room for right-side labels
-    plt.subplots_adjust(right=0.78)
-    
-    # Save figure
-    output_path = output_dir / f"{file_name.replace('.xlsx', '_nepse_impact.png')}"
+
+    # Plot normalized sectors
+    for sector in available_sectors:
+        ax.plot(
+            df_norm["Date"],
+            df_norm[sector],
+            linewidth=2,
+            alpha=0.9,
+            label=sector
+        )
+
+    # Finance Minister event lines
+    for _, row in relevant_fm_events.iterrows():
+        ax.axvline(
+            x=row["Date"],
+            linestyle="--",
+            linewidth=2,
+            color="black",
+            alpha=0.6
+        )
+
+        ax.text(
+            row["Date"],
+            ax.get_ylim()[1],
+            f"{row['Finance Minister']}\n{row['Date'].strftime('%Y-%m-%d')}",
+            rotation=90,
+            fontsize=9,
+            verticalalignment="top",
+            horizontalalignment="right",
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8)
+        )
+
+    ax.set_title(
+        f"Sectoral Reaction to Finance Minister Change (Base = 100)\n{file_name}",
+        fontsize=15,
+        weight="bold"
+    )
+    ax.set_xlabel("Date", fontsize=12, weight="bold")
+    ax.set_ylabel("Index (Base = 100)", fontsize=12, weight="bold")
+
+    ax.grid(True, linestyle=":", alpha=0.4)
+    ax.legend(loc="upper left", fontsize=10, ncol=2)
+
+    plt.xticks(rotation=45)
+    plt.subplots_adjust(right=0.95)
+
+    output_path = output_dir / f"{file_name.replace('.xlsx', '_sector_base100.png')}"
     plt.savefig(output_path, dpi=300)
     plt.close()
-    
-    print(f"✅ Generated: {output_path}")
 
+    print(f"✅ Generated: {output_path}")
 
 def main():
     # Create output directory
