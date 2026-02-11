@@ -3,7 +3,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 BASE_DIR = Path(__file__).resolve().parent
-file_2081 = BASE_DIR / "data" / "annual" / "annual7980.xlsx"
+file_2081 = BASE_DIR / "data" / "annual" / "annual8182.xlsx"
 
 # -----------------------------
 # READ FILE
@@ -50,15 +50,34 @@ selected_sectors3=[
 
 
 
-plt.figure(figsize=(14, 7))
+
 
 # Plot all columns except BUSINESS_DATE
+# for all sector 
 # for col in df.columns:
 #     if col != "BUSINESS_DATE":
 #         plt.plot(df["BUSINESS_DATE"], df[col], label=col)
+
+
+# for only selected sector 
+# for col in selected_sectors:
+#     if col in df.columns:
+#         plt.plot(df["BUSINESS_DATE"], df[col], label=col)
+
+
+# Normalize to Base 100
+df_base = df.copy()
+
 for col in selected_sectors:
-    if col in df.columns:
-        plt.plot(df["BUSINESS_DATE"], df[col], label=col)
+    if col in df_base.columns:
+        first_value = df_base[col].iloc[0]
+        df_base[col] = (df_base[col] / first_value) * 100
+        
+plt.figure(figsize=(14, 7))
+
+for col in selected_sectors:
+    if col in df_base.columns:
+        plt.plot(df_base["BUSINESS_DATE"], df_base[col], label=col)
 
 # -----------------------------
 # DETECT MONTH TRANSITIONS
@@ -88,14 +107,15 @@ for date in change_dates:
 # -----------------------------
 
 plt.xlabel("Date")
-plt.ylabel("Index Value")
 plt.title("Index Data with Monthly Change Markers")
 plt.xticks(rotation=45)
 plt.legend()
 plt.tight_layout()
+plt.axhline(y=100, linestyle="--", linewidth=1)
+plt.ylabel("Index Value (Base 100)")
 
 # Save image
-output_file = BASE_DIR / "index_chart_7980.png"
+output_file = BASE_DIR / "base_index_chart_8182.png"
 plt.savefig(output_file, dpi=300)
 
 print("Chart saved to:", output_file)
